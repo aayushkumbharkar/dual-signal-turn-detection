@@ -1,3 +1,4 @@
+spaces
 torch>=2.0.0
 lightgbm>=4.0.0
 librosa>=0.10.0

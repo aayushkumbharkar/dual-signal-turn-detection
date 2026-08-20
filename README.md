@@ -1,5 +1,5 @@
 ---
-title: Dual Signal Turn Detection Hybrid Model
+title: Dual-Signal Turn Detection
 emoji: 🎙️
 colorFrom: blue
 colorTo: green
@@ -8,7 +8,7 @@ sdk_version: 5.16.0
 app_file: app.py
 pinned: false
 license: mit
-short_description: Low-latency hybrid audio turn detection model.
+short_description: Low-latency hybrid turn detection for Indian Hinglish voice AI.
 ---
 
 # Dual-Signal Turn Detection Model
