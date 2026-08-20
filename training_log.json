@@ -1,0 +1,10 @@
+{
+  "overall_f1": 0.6666666666666666,
+  "fpr": 1.0,
+  "fnr": 0.0,
+  "fast_path_hit_rate": 1.0,
+  "slow_path_invocation_rate": 0.0,
+  "double_uncertainty_count": 0,
+  "p50_latency_ms": 6.205900004715659,
+  "p95_latency_ms": 6.774429998768028
+}
