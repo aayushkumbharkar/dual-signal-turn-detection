@@ -49,9 +49,21 @@ def analyze_audio_file(audio_input):
     if audio_input is None:
         return None, None, None, {}
     
-    sr, y = audio_input
+    if isinstance(audio_input, tuple):
+        sr, y = audio_input
+    elif isinstance(audio_input, dict):
+        sr = audio_input.get("sampling_rate", 16000)
+        y = audio_input.get("array", None)
+        if y is None:
+            return None, None, None, {}
+    else:
+        return None, None, None, {}
+
+    if y is None or len(y) == 0:
+        return None, None, None, {}
+
     y = y.astype(np.float32)
-    if y.max() > 1.0:
+    if np.abs(y).max() > 1.0:
         y = y / 32768.0
 
     if y.ndim > 1:
@@ -107,9 +119,21 @@ def analyze_mic_input(audio_input):
     if audio_input is None:
         return "Waiting...", "N/A", 0.0
     
-    sr, y = audio_input
+    if isinstance(audio_input, tuple):
+        sr, y = audio_input
+    elif isinstance(audio_input, dict):
+        sr = audio_input.get("sampling_rate", 16000)
+        y = audio_input.get("array", None)
+        if y is None:
+            return "Waiting...", "N/A", 0.0
+    else:
+        return "Waiting...", "N/A", 0.0
+
+    if y is None or len(y) == 0:
+        return "Waiting...", "N/A", 0.0
+
     y = y.astype(np.float32)
-    if y.max() > 1.0:
+    if np.abs(y).max() > 1.0:
         y = y / 32768.0
 
     if y.ndim > 1:
@@ -137,15 +161,28 @@ def build_demo():
         
         with gr.Tab("Tab 1: Interactive Analysis"):
             file_input = gr.Audio(sources=["upload"], type="numpy", label="Upload Audio (.wav)")
+            analyze_btn = gr.Button("Analyze Audio", variant="primary")
             waveform_output = gr.Plot(label="Row 1: Audio Waveform")
             prob_plot = gr.Plot(label="Row 2: Dual Probability Trace (P_fast & P_slow vs Gates 0.82 / 0.20)")
             stage_bar = gr.Textbox(label="Row 3: Stage Decision Bar")
             metrics_panel = gr.JSON(label="Row 4: Metrics Panel")
 
+            file_outputs = [waveform_output, prob_plot, stage_bar, metrics_panel]
+
+            analyze_btn.click(
+                fn=analyze_audio_file,
+                inputs=[file_input],
+                outputs=file_outputs
+            )
+            file_input.upload(
+                fn=analyze_audio_file,
+                inputs=[file_input],
+                outputs=file_outputs
+            )
             file_input.change(
                 fn=analyze_audio_file,
                 inputs=[file_input],
-                outputs=[waveform_output, prob_plot, stage_bar, metrics_panel]
+                outputs=file_outputs
             )
             
         with gr.Tab("Tab 2: Live Mic Demo"):
@@ -155,10 +192,23 @@ def build_demo():
             stage_output = gr.Textbox(label="Stage Fired", value="Stage 1 (Fast Path)")
             latency_output = gr.Number(label="Window Latency (ms)", value=4.2)
             
+            mic_outputs = [status_output, stage_output, latency_output]
+
+            mic_input.stream(
+                fn=analyze_mic_input,
+                inputs=[mic_input],
+                outputs=mic_outputs,
+                stream_every=0.5
+            )
             mic_input.change(
                 fn=analyze_mic_input,
                 inputs=[mic_input],
-                outputs=[status_output, stage_output, latency_output]
+                outputs=mic_outputs
+            )
+            mic_input.stop_recording(
+                fn=analyze_mic_input,
+                inputs=[mic_input],
+                outputs=mic_outputs
             )
             
     return demo
