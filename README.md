@@ -8,7 +8,7 @@ sdk_version: 5.16.0
 app_file: app.py
 pinned: false
 license: mit
-short_description: Low-latency hybrid turn detection model combining acoustic Fast Path & Whisper Slow Path.
+short_description: Low-latency hybrid audio turn detection model.
 ---
 
 # Dual-Signal Turn Detection Model
