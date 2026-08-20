@@ -2,6 +2,13 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .superpowers/
+.agents/
+skills-lock.json
+hf-space/
 hf_cache/
-*.pkl
-*.pt
+CLAUDE.md
+docs/
+eda_report.md
+spaces_requirements.txt
+*.pkl.bak
+*.pt.bak
