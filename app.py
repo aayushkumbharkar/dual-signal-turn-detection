@@ -1,4 +1,7 @@
-import spaces
+try:
+    import spaces
+except ImportError:
+    pass
 import gradio as gr
 from demo import build_demo
 
