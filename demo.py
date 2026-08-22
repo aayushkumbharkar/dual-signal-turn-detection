@@ -1,5 +1,4 @@
 import io
-import json
 import os
 import pickle
 import time
@@ -12,7 +11,10 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 try:
-    import spaces
+    if os.getenv("SPACE_ID"):
+        import spaces
+    else:
+        raise ImportError
 except ImportError:
     class spaces:
         @staticmethod
@@ -55,7 +57,7 @@ def fig_to_pil(fig):
     plt.close(fig)
     return img
 
-@spaces.GPU
+@spaces.GPU(duration=30)
 def analyze_audio_file(audio_input):
     if audio_input is None:
         return None, None, "No Audio Provided", "{}"
@@ -115,18 +117,16 @@ def analyze_audio_file(audio_input):
     
     stage_name = stage_labels.get(result['stage'], f"Stage {result['stage']}")
     
-    metrics = {
-        'decision': result['decision'],
-        'stage': stage_name,
-        'p_fast': round(result['p_fast'], 4),
-        'p_slow': round(result['p_slow'], 4) if result['p_slow'] is not None else 'N/A',
-        'p_final': round(result['p_final'], 4),
-        'double_uncertainty_count': detector.double_uncertainty_count
-    }
+    metrics_str = f"""Decision: {result['decision']}
+Stage: {stage_name}
+P_fast: {round(result['p_fast'], 4)}
+P_slow: {round(result['p_slow'], 4) if result['p_slow'] is not None else 'N/A'}
+P_final: {round(result['p_final'], 4)}
+Double Uncertainty Count: {detector.double_uncertainty_count}"""
     
-    return img1, img2, stage_name, json.dumps(metrics, indent=2)
+    return img1, img2, stage_name, metrics_str
 
-@spaces.GPU
+@spaces.GPU(duration=30)
 def analyze_mic_input(audio_input):
     if audio_input is None:
         return "Waiting for mic input...", "No Stage Fired", 0.0
@@ -178,7 +178,7 @@ def build_demo():
             waveform_output = gr.Image(label="Row 1: Audio Waveform")
             prob_plot = gr.Image(label="Row 2: Dual Probability Trace (P_fast & P_slow vs Gates 0.82 / 0.20)")
             stage_bar = gr.Textbox(label="Row 3: Stage Decision Bar")
-            metrics_panel = gr.Code(label="Row 4: Metrics Panel", language="json")
+            metrics_panel = gr.Textbox(label="Row 4: Metrics Panel", lines=8)
 
             file_outputs = [waveform_output, prob_plot, stage_bar, metrics_panel]
 
@@ -218,4 +218,4 @@ def build_demo():
 
 if __name__ == "__main__":
     demo = build_demo()
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", show_api=False)
