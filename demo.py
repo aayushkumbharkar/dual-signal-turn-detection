@@ -54,7 +54,6 @@ def fig_to_pil(fig):
     plt.close(fig)
     return img
 
-@spaces.GPU
 def analyze_audio_file(audio_input):
     if audio_input is None:
         return None, None, "No Audio Provided", {}
@@ -125,7 +124,6 @@ def analyze_audio_file(audio_input):
     
     return img1, img2, stage_name, metrics
 
-@spaces.GPU  
 def analyze_mic_input(audio_input):
     if audio_input is None:
         return "Waiting for mic input...", "No Stage Fired", 0.0
@@ -191,11 +189,6 @@ def build_demo():
                 inputs=[file_input],
                 outputs=file_outputs
             )
-            file_input.change(
-                fn=analyze_audio_file,
-                inputs=[file_input],
-                outputs=file_outputs
-            )
             
         with gr.Tab("Tab 2: Live Mic Demo"):
             gr.Markdown("> **Disclaimer:** Live mic latency reflects HuggingFace Spaces CPU — local benchmark is 4.2ms on CPU.")
@@ -213,11 +206,6 @@ def build_demo():
                 outputs=mic_outputs
             )
             mic_input.stop_recording(
-                fn=analyze_mic_input,
-                inputs=[mic_input],
-                outputs=mic_outputs
-            )
-            mic_input.change(
                 fn=analyze_mic_input,
                 inputs=[mic_input],
                 outputs=mic_outputs
