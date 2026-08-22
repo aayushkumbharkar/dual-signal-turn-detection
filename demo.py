@@ -3,6 +3,7 @@ import os
 import pickle
 import time
 import gradio as gr
+import gradio_client.utils as gradio_client_utils
 import numpy as np
 import torch
 import matplotlib
@@ -11,6 +12,22 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+_json_schema_to_python_type = gradio_client_utils.json_schema_to_python_type
+
+def _sanitize_schema(schema):
+    if isinstance(schema, bool):
+        return {}
+    if isinstance(schema, dict):
+        return {key: _sanitize_schema(value) for key, value in schema.items()}
+    if isinstance(schema, list):
+        return [_sanitize_schema(value) for value in schema]
+    return schema
+
+def _safe_json_schema_to_python_type(schema):
+    return _json_schema_to_python_type(_sanitize_schema(schema))
+
+gradio_client_utils.json_schema_to_python_type = _safe_json_schema_to_python_type
 
 try:
     if os.getenv("SPACE_ID"):
