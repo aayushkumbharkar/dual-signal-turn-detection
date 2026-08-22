@@ -10,6 +10,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from PIL import Image
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 try:
     if os.getenv("SPACE_ID"):
         import spaces
@@ -30,9 +32,12 @@ from models.fast_path import FastPathClassifier
 from models.slow_path import SlowPathLinearHead
 
 # Module-level model initialization
+fast_model_path = os.path.join(BASE_DIR, 'fast_path_lgbm.pkl')
+slow_model_path = os.path.join(BASE_DIR, 'slow_path_head.pt')
+
 fast_clf = FastPathClassifier()
-if os.path.exists('fast_path_lgbm.pkl'):
-    with open('fast_path_lgbm.pkl', 'rb') as f:
+if os.path.exists(fast_model_path):
+    with open(fast_model_path, 'rb') as f:
         obj = pickle.load(f)
         if isinstance(obj, FastPathClassifier):
             fast_clf = obj
@@ -40,9 +45,13 @@ if os.path.exists('fast_path_lgbm.pkl'):
             fast_clf.model = obj
 
 slow_head = SlowPathLinearHead()
-if os.path.exists('slow_path_head.pt'):
-    slow_head.load_state_dict(torch.load('slow_path_head.pt', map_location='cpu'))
+if os.path.exists(slow_model_path):
+    slow_head.load_state_dict(torch.load(slow_model_path, map_location='cpu'))
     slow_head.eval()
+
+print(f"BASE_DIR: {BASE_DIR}")
+print(f"PKL exists: {os.path.exists(fast_model_path)}")
+print(f"PT exists: {os.path.exists(slow_model_path)}")
 
 detector = HybridTurnDetector(
     fast_model=fast_clf,
@@ -82,8 +91,12 @@ def analyze_audio_file(audio_input):
     if y.ndim > 1:
         y = y.mean(axis=1)
     
-    # Run hybrid detector
-    result = detector.predict(y, buffer_dur=0.0, sr=sr)
+    try:
+        result = detector.predict(y, buffer_dur=0.0, sr=sr)
+    except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
+        return None, None, f"ERROR: {str(e)}", error_msg
     
     # Generate waveform plot
     fig1, ax1 = plt.subplots(figsize=(10, 2))
@@ -152,7 +165,10 @@ def analyze_mic_input(audio_input):
         y = y.mean(axis=1)
     
     t0 = time.perf_counter()
-    result = detector.predict(y, buffer_dur=0.0, sr=sr)
+    try:
+        result = detector.predict(y, buffer_dur=0.0, sr=sr)
+    except Exception as e:
+        return f"ERROR: {str(e)}", "No Stage", 0.0
     latency_ms = (time.perf_counter() - t0) * 1000.0
     
     stage_labels = {
