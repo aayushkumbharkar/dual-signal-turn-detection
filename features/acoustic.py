@@ -1,5 +1,47 @@
 import numpy as np
-import librosa
+import numba
+numba.config.DISABLE_JIT = True
+
+def _frame_signal(y, frame_length=1024, hop_length=512):
+    if len(y) < frame_length:
+        y = np.pad(y, (0, frame_length - len(y)))
+    frame_count = 1 + (len(y) - frame_length) // hop_length
+    shape = (frame_count, frame_length)
+    strides = (y.strides[0] * hop_length, y.strides[0])
+    return np.lib.stride_tricks.as_strided(y, shape=shape, strides=strides)
+
+def _simple_f0(y, sr, frame_length=1024, hop_length=512):
+    frames = _frame_signal(y, frame_length=frame_length, hop_length=hop_length)
+    f0_frames = []
+    for frame in frames:
+        corr = np.correlate(frame, frame, mode='full')
+        corr = corr[len(corr)//2:]
+        min_lag = int(sr / 2093)
+        max_lag = int(sr / 65)
+        if max_lag >= len(corr):
+            f0_frames.append(0.0)
+            continue
+        peak = np.argmax(corr[min_lag:max_lag]) + min_lag
+        f0 = sr / peak if peak > 0 else 0.0
+        f0_frames.append(f0)
+    return np.array(f0_frames)
+
+def _rms(y, frame_length=1024, hop_length=512):
+    frames = _frame_signal(y, frame_length=frame_length, hop_length=hop_length)
+    return np.sqrt(np.mean(frames * frames, axis=1))
+
+def _spectral_centroid(y, sr, frame_length=1024, hop_length=512):
+    frames = _frame_signal(y, frame_length=frame_length, hop_length=hop_length)
+    window = np.hanning(frame_length)
+    spectrum = np.abs(np.fft.rfft(frames * window, axis=1))
+    freqs = np.fft.rfftfreq(frame_length, d=1.0 / sr)
+    denom = np.sum(spectrum, axis=1) + 1e-10
+    return np.sum(spectrum * freqs, axis=1) / denom
+
+def _zero_crossing_rate(y, frame_length=1024, hop_length=512):
+    frames = _frame_signal(y, frame_length=frame_length, hop_length=hop_length)
+    signs = np.signbit(frames)
+    return np.mean(signs[:, 1:] != signs[:, :-1], axis=1)
 
 def extract_acoustic_features(y: np.ndarray, sr: int = 16000) -> np.ndarray:
     if len(y) == 0:
@@ -8,10 +50,10 @@ def extract_acoustic_features(y: np.ndarray, sr: int = 16000) -> np.ndarray:
     hop_length = 512
     frame_length = 1024
     
-    # 1. Fast F0 via YIN (6 features) - <3ms latency budget
+    # 1. Fast F0 via autocorrelation (6 features) - avoids numba JIT in containers
     try:
-        f0 = librosa.yin(y, fmin=80, fmax=400, sr=sr, frame_length=frame_length, hop_length=hop_length)
-        voiced_f0 = f0[(f0 > 82.0) & (f0 < 398.0)]
+        f0 = _simple_f0(y, sr, frame_length=frame_length, hop_length=hop_length)
+        voiced_f0 = f0[f0 > 0]
     except Exception:
         voiced_f0 = np.array([])
         f0 = np.array([])
@@ -28,7 +70,7 @@ def extract_acoustic_features(y: np.ndarray, sr: int = 16000) -> np.ndarray:
     f0_final_minus_mean = f0_final_frame - f0_mean
 
     # 2. Energy / RMS (6 features)
-    rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
+    rms = _rms(y, frame_length=frame_length, hop_length=hop_length)
     rms_mean = float(np.mean(rms))
     rms_std = float(np.std(rms))
     rms_slope = float(np.polyfit(np.arange(len(rms)), rms, 1)[0]) if len(rms) > 1 else 0.0
@@ -65,10 +107,10 @@ def extract_acoustic_features(y: np.ndarray, sr: int = 16000) -> np.ndarray:
         silence_threshold_crossings = 0.0
 
     # 4. Spectral (3 features)
-    spec_cent = librosa.feature.spectral_centroid(y=y, sr=sr, hop_length=hop_length)[0]
+    spec_cent = _spectral_centroid(y, sr, frame_length=frame_length, hop_length=hop_length)
     spectral_centroid_mean = float(np.mean(spec_cent))
     spectral_centroid_slope = float(np.polyfit(np.arange(len(spec_cent)), spec_cent, 1)[0]) if len(spec_cent) > 1 else 0.0
-    zcr = librosa.feature.zero_crossing_rate(y=y, hop_length=hop_length)[0]
+    zcr = _zero_crossing_rate(y, frame_length=frame_length, hop_length=hop_length)
     zcr_mean = float(np.mean(zcr))
 
     return np.array([
