@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import pickle
 import time
@@ -54,9 +55,10 @@ def fig_to_pil(fig):
     plt.close(fig)
     return img
 
+@spaces.GPU
 def analyze_audio_file(audio_input):
     if audio_input is None:
-        return None, None, "No Audio Provided", {}
+        return None, None, "No Audio Provided", "{}"
     
     if isinstance(audio_input, tuple):
         sr, y = audio_input
@@ -64,12 +66,12 @@ def analyze_audio_file(audio_input):
         sr = audio_input.get("sampling_rate", 16000)
         y = audio_input.get("array", None)
         if y is None:
-            return None, None, "Invalid Audio Format", {}
+            return None, None, "Invalid Audio Format", "{}"
     else:
-        return None, None, "Invalid Audio Format", {}
+        return None, None, "Invalid Audio Format", "{}"
 
     if y is None or len(y) == 0:
-        return None, None, "Empty Audio", {}
+        return None, None, "Empty Audio", "{}"
 
     y = y.astype(np.float32)
     if np.abs(y).max() > 1.0:
@@ -122,8 +124,9 @@ def analyze_audio_file(audio_input):
         'double_uncertainty_count': detector.double_uncertainty_count
     }
     
-    return img1, img2, stage_name, metrics
+    return img1, img2, stage_name, json.dumps(metrics, indent=2)
 
+@spaces.GPU
 def analyze_mic_input(audio_input):
     if audio_input is None:
         return "Waiting for mic input...", "No Stage Fired", 0.0
@@ -175,7 +178,7 @@ def build_demo():
             waveform_output = gr.Image(label="Row 1: Audio Waveform")
             prob_plot = gr.Image(label="Row 2: Dual Probability Trace (P_fast & P_slow vs Gates 0.82 / 0.20)")
             stage_bar = gr.Textbox(label="Row 3: Stage Decision Bar")
-            metrics_panel = gr.JSON(label="Row 4: Metrics Panel")
+            metrics_panel = gr.Code(label="Row 4: Metrics Panel", language="json")
 
             file_outputs = [waveform_output, prob_plot, stage_bar, metrics_panel]
 
